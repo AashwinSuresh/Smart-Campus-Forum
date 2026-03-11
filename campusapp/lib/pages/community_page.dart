@@ -21,9 +21,9 @@ class _CommunityPageState extends State<CommunityPage> {
         userProfilePic:
             "https://api.dicebear.com/7.x/avataaars/png?seed=Aashwin",
         postedTime: DateTime.now().subtract(const Duration(days: 4)),
-        title: "Arjun as got pregnant",
+        title: "Upcoming AI Workshop!",
         content:
-            "CAN'T BELIEVE I'M FINALLY SHARING THIS NEWS! IT'S BEEN A WILD JOURNEY SO FAR...",
+            "Join us this Friday at the Seminar Hall for a deep dive into Machine Learning and NLP. Don't forget your laptops!",
         likes: 69,
         commentCount: 100,
       ),

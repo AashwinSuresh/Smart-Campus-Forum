@@ -19,7 +19,7 @@ class _DashboardState extends State<Dashboard> {
       child: Text("Lost and Found", style: TextStyle(color: Colors.white)),
     ),
     const Center(
-      child: Text("SEXUAL", style: TextStyle(color: Colors.white)),
+      child: Text("Report page", style: TextStyle(color: Colors.white)),
     ),
   ];
   @override

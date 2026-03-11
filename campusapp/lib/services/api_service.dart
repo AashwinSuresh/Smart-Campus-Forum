@@ -6,14 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 
 class ApiService {
-  //static const String baseUrl = "http://192.168.29.71:8000";
+  static const String baseUrl = "http://10.21.181.152:8000";
   //static const String baseUrl = "http://10.207.195.152:8000";
-  static const String baseUrl = "http://192.168.1.76:8000";
+  //static const String baseUrl = "http://192.168.1.76:8000";
 
   static final supabase = Supabase.instance.client;
 
   static Future<List<EventModel>> fetchEvents({String? search, String? date, int page = 1,int limit = 5}) async {
-    // Logic: Construct a dynamic URL with query parameters
     String urlStr = "$baseUrl/events?page=$page&limit=$limit&";
     if (search != null) urlStr += "search=$search&";
     if (date != null) urlStr += "date=$date";
@@ -27,7 +26,7 @@ class ApiService {
           title: json['title'],
           description: json['description'],
           image_url: json['image_url'],
-          event_date: DateTime.parse(json['event_date']), // Standard ISO format
+          event_date: DateTime.parse(json['event_date']), 
           venue: json['venue'],
         )).toList();
       }
@@ -90,7 +89,7 @@ static Future<bool> createEvent({
     print("Image URL: $imageUrl");
     print("Step 3: Sending to FastAPI...");
     final response = await http.post(
-      Uri.parse("$baseUrl/events"),
+      Uri.parse("$baseUrl/events_post"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "title": title,

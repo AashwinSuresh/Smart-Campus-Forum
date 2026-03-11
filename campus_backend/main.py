@@ -203,7 +203,7 @@ async def get_events(search: str = None, date : str = None, page : int =1, limit
 #         print(f"STILL FAILING: {e}")
 #         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/events")
+@app.post("/events_post")
 async def add_event(event: EventCreate):
     try:
         data = {
@@ -213,7 +213,6 @@ async def add_event(event: EventCreate):
             "event_date": event.event_date,
             "image_url": event.image_url
         }
-        # Insert into the Supabase table you created earlier
         response = supabase.table("events").insert(data).execute()
         return {"status": "success", "data": response.data}
     except Exception as e:
