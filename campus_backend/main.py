@@ -7,6 +7,7 @@ from datetime import datetime
 from supabase import create_client, Client
 from fastapi.middleware.cors import CORSMiddleware
 from community import router as community_router
+from typing import Optional
 
 app = FastAPI()
 
@@ -29,7 +30,7 @@ app.add_middleware(
 
 
 #supabase
-# load_dotenv()
+load_dotenv()
 
 supabase_url = os.getenv("supabase_url")
 supabase_key = os.getenv("supabase_key")
@@ -38,7 +39,11 @@ supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 # supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5bnpjbGlsY3N5a3Bha2plenV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MjgxMzUsImV4cCI6MjA4NzUwNDEzNX0.DmjpHqrSu4WffjYCO2O-yK7sJMHonqkAC5g1Z9quQm4"
 
 
-supabase: Client = create_client(supabase_url, supabase_service_key)
+supabase1: Client = create_client(supabase_url, supabase_service_key)
+supabase_url1 = "https://hmbfexybfgpmbrsisdfi.supabase.co"
+supabase_key1 = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtYmZleHliZmdwbWJyc2lzZGZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1ODU1ODMsImV4cCI6MjA4OTE2MTU4M30.zeEUk-kcmzadiimcTzejKPpAZDdBGRwOuXeA3B_gA2Q"
+
+supabase: Client = create_client(supabase_url1, supabase_key1)
 
 class EventCreate(BaseModel):  #for events
     title: str
@@ -46,6 +51,34 @@ class EventCreate(BaseModel):  #for events
     venue: str
     event_date: str
     image_url: str
+
+#suraaa
+
+
+class LostFoundItem(BaseModel):  # for lost and found
+    title: str
+    description: str
+    type: str          # "lost" or "found"
+    category: str
+    location: str
+    contact_info: str
+    posted_by: str
+    image_url: str = None  # optional
+
+class StatusUpdate(BaseModel):
+    status: str  # "open" or "resolved"
+
+class LostFoundItem(BaseModel): #for lost and found
+    title: str
+    description: str
+    type: str           # "lost" or "found"
+    category: str
+    location: str
+    contact_info: str
+    posted_by: str
+    image_url: Optional[str] = None  # ← THIS ACCEPTS null properly
+
+
 
 
 class EtLabCredentials(BaseModel):
@@ -82,7 +115,7 @@ async def login_to_etlab(data: EtLabCredentials):
 
             try:
                 # 2. Try to Sign In (if user already exists)
-                auth_res = supabase.auth.sign_in_with_password({
+                auth_res = supabase1.auth.sign_in_with_password({
                     "email": user_email, 
                     "password": data.password
                 })
@@ -90,28 +123,28 @@ async def login_to_etlab(data: EtLabCredentials):
                 # 3. Create New User if Sign In fails
                 try:
                     # Admin create doesn't return a session, just the user
-                    supabase.auth.admin.create_user({
+                    supabase1.auth.admin.create_user({
                         "email": user_email,
                         "password": data.password,
                         "user_metadata": {"full_name": full_name},
                         "email_confirm": True
                     })
                     # MUST sign in after creation to get the Session object for Flutter
-                    auth_res = supabase.auth.sign_in_with_password({
+                    auth_res = supabase1.auth.sign_in_with_password({
                         "email": user_email, 
                         "password": data.password
                     })
                 except Exception as create_err:
                     # 4. Fallback: Password mismatch on existing account
-                    users_list = supabase.auth.admin.list_users()
+                    users_list = supabase1.auth.admin.list_users()
                     target_user = next((u for u in users_list if u.email == user_email), None)
                     
                     if target_user:
-                        supabase.auth.admin.update_user_by_id(
+                        supabase1.auth.admin.update_user_by_id(
                             target_user.id, 
                             attributes={'password': data.password}
                         )
-                        auth_res = supabase.auth.sign_in_with_password({
+                        auth_res = supabase1.auth.sign_in_with_password({
                             "email": user_email, 
                             "password": data.password
                         })
@@ -121,7 +154,7 @@ async def login_to_etlab(data: EtLabCredentials):
             user_id = auth_res.user.id
 
             # 5. Sync to systematic 'users' table
-            supabase.table("users").upsert({
+            supabase1.table("users").upsert({
                 "id": user_id,
                 "etlab_id": data.username,
                 "full_name": full_name,
@@ -239,7 +272,7 @@ async def login_to_etlab(data: EtLabCredentials):
 @app.get("/events")
 async def get_events(search: str = None, date : str = None, page : int =1, limit: int = 5):
     try:
-        query = supabase.table("events").select("*")
+        query = supabase1.table("events").select("*")
 
         if date and date != "All":
             query = query.gte("event_date", f"{date}T00:00:00")\
@@ -288,8 +321,101 @@ async def add_event(event: EventCreate):
             "event_date": event.event_date,
             "image_url": event.image_url
         }
-        response = supabase.table("events").insert(data).execute()
+        response = supabase1.table("events").insert(data).execute()
         return {"status": "success", "data": response.data}
     except Exception as e:
         print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+#suraa
+
+@app.get("/lost-found")
+async def get_lost_found_items(type: str = None, category: str = None, status: str = None):
+    try:
+        query = supabase.table("lost_and_found").select("*").order("created_at", desc=True)
+
+        if type:
+            query = query.eq("type", type)
+        if category:
+            query = query.eq("category", category)
+        if status:
+            query = query.eq("status", status)
+
+        response = query.execute()
+        return {"status": "success", "items": response.data}
+    except Exception as e:
+        print(f"DEBUG ERROR: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# GET single item by ID
+@app.get("/lost-found/{item_id}")
+async def get_lost_found_item(item_id: str):
+    try:
+        response = supabase.table("lost_and_found").select("*").eq("id", item_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return {"status": "success", "item": response.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# POST — report a new lost or found item
+@app.post("/lost-found")
+async def create_lost_found_item(item: LostFoundItem):
+    try:
+        data = {
+            "title": item.title,
+            "description": item.description,
+            "type": item.type,
+            "category": item.category,
+            "location": item.location,
+            "contact_info": item.contact_info,
+            "posted_by": item.posted_by,
+            "image_url": item.image_url,
+            "status": "open"
+        }
+        response = supabase.table("lost_and_found").insert(data).execute()
+        return {"status": "success", "item": response.data[0]}
+    except Exception as e:
+        print(f"Server Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# PATCH — mark item as resolved or reopen it
+@app.patch("/lost-found/{item_id}/status")
+async def update_lost_found_status(item_id: str, update: StatusUpdate):
+    try:
+        response = supabase.table("lost_and_found")\
+            .update({"status": update.status})\
+            .eq("id", item_id)\
+            .execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return {"status": "success", "item": response.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# DELETE — remove a post
+@app.delete("/lost-found/{item_id}")
+async def delete_lost_found_item(item_id: str):
+    try:
+        supabase.table("lost_and_found").delete().eq("id", item_id).execute()
+        return {"status": "success", "message": "Item deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# GET — search by keyword in title or description
+@app.get("/lost-found-search")
+async def search_lost_found(q: str):
+    try:
+        response = supabase.table("lost_and_found")\
+            .select("*")\
+            .ilike("title", f"%{q}%")\
+            .execute()
+        return {"status": "success", "items": response.data}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

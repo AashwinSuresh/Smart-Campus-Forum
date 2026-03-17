@@ -6,14 +6,19 @@ import 'package:campusapp/models/post_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-
 class ApiService {
-  static const String baseUrl = "http://10.21.181.180:8000";  //static const String baseUrl = "http://10.207.195.152:8000";
+  static const String baseUrl =
+      "http://192.168.29.143:8000"; //static const String baseUrl = "http://10.207.195.152:8000";
   //static const String baseUrl = "http://192.168.1.76:8000";
 
   static final supabase = Supabase.instance.client;
 
-  static Future<List<EventModel>> fetchEvents({String? search, String? date, int page = 1,int limit = 5}) async {
+  static Future<List<EventModel>> fetchEvents({
+    String? search,
+    String? date,
+    int page = 1,
+    int limit = 5,
+  }) async {
     String urlStr = "$baseUrl/events?page=$page&limit=$limit&";
     if (search != null) urlStr += "search=$search&";
     if (date != null) urlStr += "date=$date";
@@ -22,14 +27,18 @@ class ApiService {
       final response = await http.get(Uri.parse(urlStr));
       if (response.statusCode == 200) {
         List data = jsonDecode(response.body)['event'];
-        return data.map((json) => EventModel(
-          id: json['id'],
-          title: json['title'],
-          description: json['description'],
-          image_url: json['image_url'],
-          event_date: DateTime.parse(json['event_date']), 
-          venue: json['venue'],
-        )).toList();
+        return data
+            .map(
+              (json) => EventModel(
+                id: json['id'],
+                title: json['title'],
+                description: json['description'],
+                image_url: json['image_url'],
+                event_date: DateTime.parse(json['event_date']),
+                venue: json['venue'],
+              ),
+            )
+            .toList();
       }
       return [];
     } catch (e) {
@@ -52,7 +61,7 @@ class ApiService {
   //     };
   //   } catch (e) {
   //     return {
-  //       "statusCode": 500, 
+  //       "statusCode": 500,
   //       "body": {"detail": "ETLAB proxy error: Check your wifi or server"}
   //     };
   //   }
@@ -82,20 +91,25 @@ class ApiService {
   //   } catch (e) {
   //     print("Login Error: $e");
   //     return {
-  //       "statusCode": 500, 
+  //       "statusCode": 500,
   //       "body": {"detail": "Connection error: Check your server or network"}
   //     };
   //   }
   // }
-static Future<Map<String, dynamic>> login(String username, String password) async {
+  static Future<Map<String, dynamic>> login(
+    String username,
+    String password,
+  ) async {
     final url = Uri.parse("$baseUrl/login");
 
     try {
-      final response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"username": username, "password": password}),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            url,
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({"username": username, "password": password}),
+          )
+          .timeout(const Duration(seconds: 30));
 
       print("DEBUG Status: ${response.statusCode}");
       print("DEBUG Body: ${response.body}");
@@ -104,11 +118,11 @@ static Future<Map<String, dynamic>> login(String username, String password) asyn
 
       if (response.statusCode == 200) {
         final sessionData = responseData['session'];
-        
+
         // --- PHASE 1: CORRECT SESSION INJECTION ---
         // We provide the access token AND the refresh token to satisfy Supabase
-        await supabase.auth.setSession(sessionData['refresh_token']); 
-        
+        await supabase.auth.setSession(sessionData['refresh_token']);
+
         /* Note: In the latest flutter_supabase, passing the refresh token 
            is enough for it to recover the full session.
         */
@@ -118,68 +132,68 @@ static Future<Map<String, dynamic>> login(String username, String password) asyn
       }
 
       return {"statusCode": response.statusCode, "body": responseData};
-      
     } catch (e) {
       print("Flutter Login Error: $e");
       return {
-        "statusCode": 500, 
-        "body": {"detail": "Connection error: ${e.toString()}"}
+        "statusCode": 500,
+        "body": {"detail": "Connection error: ${e.toString()}"},
       };
     }
   }
 
-
   static Future<List<dynamic>> fetchLogs() async {
-  final url = Uri.parse("$baseUrl/admin/logs");
-  
-  try {
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body)['logs'];
+    final url = Uri.parse("$baseUrl/admin/logs");
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['logs'];
+      }
+      return [];
+    } catch (e) {
+      return [];
     }
-    return [];
-  } catch (e) {
-    return [];
   }
-}
 
-// adding new event image into supabase db......
+  // adding new event image into supabase db......
 
-static Future<bool> createEvent({
-  required String title,
-  required String description,
-  required String venue,
-  required DateTime date,
-  required File imageFile,
-}) async {
-  try {
-    final fileName = "${DateTime.now().millisecondsSinceEpoch}.jpg";
-    print("Step 1: Uploading to Supabase...");
-    await supabase.storage.from('event_images').upload(fileName, imageFile);
-    print("Step 2: Getting Public URL...");
-    final imageUrl = supabase.storage.from('event_images').getPublicUrl(fileName);
-    print("Image URL: $imageUrl");
-    print("Step 3: Sending to FastAPI...");
-    final response = await http.post(
-      Uri.parse("$baseUrl/events_post"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "title": title,
-        "description": description,
-        "venue": venue,
-        "event_date": date.toIso8601String(),
-        "image_url": imageUrl,
-      }),
-    );
-    print("FastAPI Response: ${response.statusCode} - ${response.body}");
+  static Future<bool> createEvent({
+    required String title,
+    required String description,
+    required String venue,
+    required DateTime date,
+    required File imageFile,
+  }) async {
+    try {
+      final fileName = "${DateTime.now().millisecondsSinceEpoch}.jpg";
+      print("Step 1: Uploading to Supabase...");
+      await supabase.storage.from('event_images').upload(fileName, imageFile);
+      print("Step 2: Getting Public URL...");
+      final imageUrl = supabase.storage
+          .from('event_images')
+          .getPublicUrl(fileName);
+      print("Image URL: $imageUrl");
+      print("Step 3: Sending to FastAPI...");
+      final response = await http.post(
+        Uri.parse("$baseUrl/events_post"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "title": title,
+          "description": description,
+          "venue": venue,
+          "event_date": date.toIso8601String(),
+          "image_url": imageUrl,
+        }),
+      );
+      print("FastAPI Response: ${response.statusCode} - ${response.body}");
 
-    return response.statusCode == 200;
-  }catch (e) {
-    print("Upload Error: $e");
-    print("CATCH ERROR in createEvent: $e");
-    return false;
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Upload Error: $e");
+      print("CATCH ERROR in createEvent: $e");
+      return false;
+    }
   }
-}
 
   // ─── Community Posts (via FastAPI backend) ────────────────────────────────
 
@@ -313,4 +327,73 @@ static Future<bool> createEvent({
     }
   }
 
+  //suraa
+
+  static Future<List<dynamic>> getItems({String? type, String? status}) async {
+    String url = '$baseUrl/lost-found';
+    List<String> params = [];
+    if (type != null) params.add('type=$type');
+    if (status != null) params.add('status=$status');
+    if (params.isNotEmpty) url += '?${params.join('&')}';
+
+    print('🔍 GET ITEMS URL: $url'); // ← ADD
+    try {
+      final response = await http.get(Uri.parse(url));
+      print('✅ GET ITEMS STATUS: ${response.statusCode}'); // ← ADD
+      print('📦 GET ITEMS BODY: ${response.body}'); // ← ADD
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['items'];
+      }
+      throw Exception('Failed to load items');
+    } catch (e) {
+      print('❌ GET ITEMS ERROR: $e'); // ← ADD
+      throw Exception(e);
+    }
+  }
+
+  static Future<void> createItem(Map<String, dynamic> item) async {
+    print('📤 CREATE ITEM PAYLOAD: $item'); // ← ADD
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/lost-found'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(item),
+      );
+      print('✅ CREATE STATUS: ${response.statusCode}'); // ← ADD
+      print('📦 CREATE BODY: ${response.body}'); // ← ADD
+      if (response.statusCode != 200) throw Exception('Failed to post item');
+    } catch (e) {
+      print('❌ CREATE ITEM ERROR: $e'); // ← ADD
+      throw Exception(e);
+    }
+  }
+
+  static Future<void> markResolved(String itemId) async {
+    print('🔄 MARKING RESOLVED: $itemId'); // ← ADD
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/lost-found/$itemId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'status': 'resolved'}),
+      );
+      print('✅ RESOLVE STATUS: ${response.statusCode}'); // ← ADD
+    } catch (e) {
+      print('❌ RESOLVE ERROR: $e'); // ← ADD
+    }
+  }
+
+  static Future<List<dynamic>> searchItems(String query) async {
+    print('🔎 SEARCHING: $query'); // ← ADD
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/lost-found-search?q=$query'),
+      );
+      print('✅ SEARCH STATUS: ${response.statusCode}'); // ← ADD
+      print('📦 SEARCH BODY: ${response.body}'); // ← ADD
+      return jsonDecode(response.body)['items'];
+    } catch (e) {
+      print('❌ SEARCH ERROR: $e'); // ← ADD
+      return [];
+    }
+  }
 }
