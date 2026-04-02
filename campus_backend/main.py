@@ -7,12 +7,17 @@ from datetime import datetime
 from supabase import create_client, Client
 from fastapi.middleware.cors import CORSMiddleware
 from community import router as community_router
+from harassment import router as harassment_router
+from backup_lost_found import router as backup_lost_found_router
+
 from typing import Optional
 
 app = FastAPI()
 
 # ── Include routers ────────────────────────────────────────────────────────────
 app.include_router(community_router)
+app.include_router(harassment_router)
+app.include_router(backup_lost_found_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,10 +39,12 @@ load_dotenv()
 
 supabase_url = os.getenv("supabase_url")
 supabase_key = os.getenv("supabase_key")
-supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-# supabase_url = "https://lynzclilcsykpakjezuv.supabase.co"
-# supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5bnpjbGlsY3N5a3Bha2plenV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MjgxMzUsImV4cCI6MjA4NzUwNDEzNX0.DmjpHqrSu4WffjYCO2O-yK7sJMHonqkAC5g1Z9quQm4"
-
+supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
+    "supabase_service_key"
+)
+supabase_url = "https://lynzclilcsykpakjezuv.supabase.co"
+supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5bnpjbGlsY3N5a3Bha2plenV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MjgxMzUsImV4cCI6MjA4NzUwNDEzNX0.DmjpHqrSu4WffjYCO2O-yK7sJMHonqkAC5g1Z9quQm4"
+ 
 
 supabase1: Client = create_client(supabase_url, supabase_service_key)
 supabase_url1 = "https://hmbfexybfgpmbrsisdfi.supabase.co"
