@@ -127,7 +127,7 @@ class _EventsPageState extends State<EventsPage> {
   );
   @override
   Widget build(BuildContext context) {
-    bool hasAuth = true;
+    // bool hasAuth = true;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

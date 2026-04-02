@@ -8,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
   static const String baseUrl =
-      "http://192.168.29.143:8000"; //static const String baseUrl = "http://10.207.195.152:8000";
+      "http://192.168.1.37:8000"; //static const String baseUrl = "http://10.207.195.152:8000";
   //static const String baseUrl = "http://192.168.1.76:8000";
 
   static final supabase = Supabase.instance.client;
@@ -336,64 +336,66 @@ class ApiService {
     if (status != null) params.add('status=$status');
     if (params.isNotEmpty) url += '?${params.join('&')}';
 
-    print('🔍 GET ITEMS URL: $url'); // ← ADD
+    print(' GET ITEMS URL: $url'); // ← ADD
     try {
       final response = await http.get(Uri.parse(url));
-      print('✅ GET ITEMS STATUS: ${response.statusCode}'); // ← ADD
-      print('📦 GET ITEMS BODY: ${response.body}'); // ← ADD
+      print(' GET ITEMS STATUS: ${response.statusCode}'); // ← ADD
+      print(' GET ITEMS BODY: ${response.body}'); // ← ADD
       if (response.statusCode == 200) {
         return jsonDecode(response.body)['items'];
       }
       throw Exception('Failed to load items');
     } catch (e) {
-      print('❌ GET ITEMS ERROR: $e'); // ← ADD
+      print(' GET ITEMS ERROR: $e'); // ← ADD
       throw Exception(e);
     }
   }
 
   static Future<void> createItem(Map<String, dynamic> item) async {
-    print('📤 CREATE ITEM PAYLOAD: $item'); // ← ADD
+    print(' CREATE ITEM PAYLOAD: $item'); // ← ADD
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/lost-found'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(item),
       );
-      print('✅ CREATE STATUS: ${response.statusCode}'); // ← ADD
-      print('📦 CREATE BODY: ${response.body}'); // ← ADD
+      print(' CREATE STATUS: ${response.statusCode}'); // ← ADD
+      print(' CREATE BODY: ${response.body}'); // ← ADD
       if (response.statusCode != 200) throw Exception('Failed to post item');
     } catch (e) {
-      print('❌ CREATE ITEM ERROR: $e'); // ← ADD
+      print(' CREATE ITEM ERROR: $e'); // ← ADD
       throw Exception(e);
     }
   }
 
   static Future<void> markResolved(String itemId) async {
-    print('🔄 MARKING RESOLVED: $itemId'); // ← ADD
+    print(' MARKING RESOLVED: $itemId'); // ← ADD
     try {
       final response = await http.patch(
         Uri.parse('$baseUrl/lost-found/$itemId/status'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'status': 'resolved'}),
       );
-      print('✅ RESOLVE STATUS: ${response.statusCode}'); // ← ADD
+      print(' RESOLVE STATUS: ${response.statusCode}'); // ← ADD
     } catch (e) {
-      print('❌ RESOLVE ERROR: $e'); // ← ADD
+      print(' RESOLVE ERROR: $e'); // ← ADD
     }
   }
 
   static Future<List<dynamic>> searchItems(String query) async {
-    print('🔎 SEARCHING: $query'); // ← ADD
+    print(' SEARCHING: $query'); // ← ADD
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/lost-found-search?q=$query'),
       );
-      print('✅ SEARCH STATUS: ${response.statusCode}'); // ← ADD
-      print('📦 SEARCH BODY: ${response.body}'); // ← ADD
+      print(' SEARCH STATUS: ${response.statusCode}'); // ← ADD
+      print(' SEARCH BODY: ${response.body}'); // ← ADD
       return jsonDecode(response.body)['items'];
     } catch (e) {
-      print('❌ SEARCH ERROR: $e'); // ← ADD
+      print(' SEARCH ERROR: $e'); // ← ADD
       return [];
     }
   }
+
+
 }
