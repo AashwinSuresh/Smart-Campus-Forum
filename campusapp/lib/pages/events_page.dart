@@ -127,7 +127,9 @@ class _EventsPageState extends State<EventsPage> {
   );
   @override
   Widget build(BuildContext context) {
-    // bool hasAuth = true;
+    final bool canCreate = ApiService.currentUserRole == 'admin' || ApiService.currentUserRole == 'club_rep';
+    print("EVENTS PAGE BUILD: User Role: ${ApiService.currentUserRole}, Can Create: $canCreate");
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -377,20 +379,26 @@ class _EventsPageState extends State<EventsPage> {
       //     ],
       //   ),
       // ) : null,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (context) => CreateEvent()));
-        },
-        
-        heroTag: "events_fab_tag",
-        icon: Icon(Icons.my_library_add_sharp, color: Colors.black,),
-        label: Text('Create new', style: TextStyle(
-          color: Colors.black
-        ),),
-        backgroundColor: Colors.white,
-      ),
+      floatingActionButton: (ApiService.currentUserRole == 'admin' ||
+              ApiService.currentUserRole == 'club_rep')
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (context) => CreateEvent()));
+              },
+              heroTag: "events_fab_tag",
+              icon: Icon(
+                Icons.my_library_add_sharp,
+                color: Colors.black,
+              ),
+              label: Text(
+                'Create new',
+                style: TextStyle(color: Colors.black),
+              ),
+              backgroundColor: Colors.white,
+            )
+          : null,
     );
   }
 

@@ -10,6 +10,7 @@ class ApiService {
   static const String baseUrl ="http://10.141.4.152:8000";
 
   static final supabase = Supabase.instance.client;
+  static String? currentUserRole; // Store role globally for UI checks
 
   static Future<List<EventModel>> fetchEvents({
     String? search,
@@ -107,7 +108,7 @@ class ApiService {
             headers: {"Content-Type": "application/json"},
             body: jsonEncode({"username": username, "password": password}),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 60));
 
       print("DEBUG Status: ${response.statusCode}");
       print("DEBUG Body: ${response.body}");
@@ -118,14 +119,15 @@ class ApiService {
         final sessionData = responseData['session'];
 
         // --- PHASE 1: CORRECT SESSION INJECTION ---
-        // We provide the access token AND the refresh token to satisfy Supabase
+        // Supabase Flutter requires the refresh token to set a session manually,
+        // or a full serialized JSON session object if using recoverSession.
         await supabase.auth.setSession(sessionData['refresh_token']);
 
-        /* Note: In the latest flutter_supabase, passing the refresh token 
-           is enough for it to recover the full session.
-        */
+        // --- PHASE 2: STORE ROLE ---
+        final rawRole = responseData['user']['role'] ?? 'student';
+        currentUserRole = rawRole.toString().toLowerCase();
 
-        print("SUCCESS: Logged in as ${supabase.auth.currentUser?.id}");
+        print("DEBUG FRONTEND LOGIN: User role received logic: $rawRole -> $currentUserRole");
         return {"statusCode": 200, "body": responseData};
       }
 
@@ -411,7 +413,12 @@ class ApiService {
     try {
       final response = await http.get(Uri.parse("$baseUrl/user/profile/$userId"));
       if (response.statusCode == 200) {
-        return jsonDecode(response.body)['user'];
+        final profile = jsonDecode(response.body)['user'];
+        final rawRole = profile['role'] ?? 'student';
+        currentUserRole = rawRole.toString().toLowerCase(); // Auto-set role in lowercase
+
+        print("DEBUG FRONTEND FETCH ROLE: Current user role synced: $rawRole -> $currentUserRole");
+        return profile;
       }
       return null;
     } catch (e) {
@@ -420,11 +427,67 @@ class ApiService {
     }
   }
 
+  static Future<void> fetchRole() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId != null) {
+      await fetchUserProfile(userId);
+    }
+  }
+
+  static Future<void> registerFCMToken(String token) async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final response = await http.post(
+        Uri.parse("$baseUrl/user/update-fcm"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "user_id": userId,
+          "fcm_token": token,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print("SUCCESS: FCM Token registered for $userId");
+      }
+    } catch (e) {
+      print("FCM Registration Error: $e");
+    }
+  }
+
   static Future<void> logout() async {
     try {
       await supabase.auth.signOut();
+      currentUserRole = null;
     } catch (e) {
       print("Logout Error: $e");
+    }
+  }
+
+  // ─── Admin Operations ──────────────────────────────────────────────────────
+
+  static Future<bool> adminCreateUser({
+    required String email,
+    required String password,
+    required String fullName,
+    required String role,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/admin/create-user"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": email,
+          "password": password,
+          "full_name": fullName,
+          "role": role,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Admin Create User Error: $e");
+      return false;
     }
   }
 }

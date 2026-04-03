@@ -1,25 +1,31 @@
 import 'package:campusapp/core/app_colors.dart';
 import 'package:campusapp/pages/dashboard.dart';
-import 'package:campusapp/pages/harassment/my_reports_page.dart';
 import 'package:campusapp/pages/login_page.dart';
 import 'package:campusapp/pages/splashScreen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:campusapp/pages/backup_lost_found/backup_lost_found_list_page.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-//import 'package:campusapp/pages/study_page.dart';
 import 'package:flutter/material.dart';
-//import 'package:flutter/services.dart';
-//import 'package:google_fonts/google_fonts.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-    await dotenv.load(fileName: ".env");
+  await dotenv.load(fileName: ".env");
 
-    await Supabase.initialize(
-      url: dotenv.env['supabase_url'] ?? '',
-      anonKey: dotenv.env['supabase_key'] ?? '',
-    );
+  // Initialize Firebase (Requires google-services.json in android/app)
+  try {
+    await Firebase.initializeApp();
+    // Request notification permissions
+    await FirebaseMessaging.instance.requestPermission();
+  } catch (e) {
+    print("Firebase Initialization Error: $e");
+  }
+
+  await Supabase.initialize(
+    url: dotenv.env['supabase_url'] ?? '',
+    anonKey: dotenv.env['supabase_key'] ?? '',
+  );
   runApp(const MyApp());
 }
 
@@ -28,10 +34,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Check for an existing session on the phone
-    // Supabase stores this automatically after your successful login.
-    //final session = Supabase.instance.client.auth.currentSession;
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Campus App',
@@ -60,10 +62,7 @@ class MyApp extends StatelessWidget {
           bodyMedium: TextStyle(color: AppColors.textSecondary),
         ),
       ),
-      // 2. Dynamic Home Selection
-      // If session is NOT null, jump straight to Dashboard.
-      home: SplashScreen(),
-      //home: BackupLostFoundListPage(),
+      home: const SplashScreen(),
     );
   }
 }

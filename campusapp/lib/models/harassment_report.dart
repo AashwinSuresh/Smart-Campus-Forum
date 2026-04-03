@@ -9,6 +9,11 @@ class HarassmentReport {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // New fields for staff visibility
+  final String? reporterName;
+  final String? reporterDept;
+  final String? reporterPic;
+
   HarassmentReport({
     required this.id,
     required this.title,
@@ -19,9 +24,15 @@ class HarassmentReport {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.reporterName,
+    this.reporterDept,
+    this.reporterPic,
   });
 
   factory HarassmentReport.fromJson(Map<String, dynamic> json) {
+    // Check if nested user object exists (from Staff/Admin join)
+    final userData = json['users'];
+    
     return HarassmentReport(
       id: json['report_id'] as String,
       title: json['title'] as String,
@@ -32,6 +43,9 @@ class HarassmentReport {
       status: json['status'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] ?? json['created_at'] as String),
+      reporterName: userData != null ? userData['full_name'] : null,
+      reporterDept: userData != null ? userData['department'] : null,
+      reporterPic: userData != null ? userData['profile_pic_url'] : null,
     );
   }
 

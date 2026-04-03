@@ -8,7 +8,7 @@ class HarassmentService {
   // Make this a getter so it doesn't evaluate eagerly and crash if uninitialized
   static SupabaseClient get supabase => Supabase.instance.client;
 
-  /// Fetch all harassment reports for the current user
+  /// Fetch all harassment reports for the current user (Student view)
   static Future<List<HarassmentReport>> fetchReports() async {
     try {
       final session = supabase.auth.currentSession;
@@ -20,7 +20,6 @@ class HarassmentService {
       }
 
       final url = '${ApiService.baseUrl}/harassment-reports?user_id=$userId';
-      // The session and token are correctly extracted above.
 
       final response = await http.get(
         Uri.parse(url),
@@ -34,10 +33,34 @@ class HarassmentService {
         final List data = jsonDecode(response.body)['reports'];
         return data.map((json) => HarassmentReport.fromJson(json)).toList();
       }
-      print('Failed to fetch reports: ${response.body}');
       return [];
     } catch (e) {
       print('Error fetching reports: $e');
+      return [];
+    }
+  }
+
+  /// [STAFF ONLY] Fetch all harassment reports in the database
+  static Future<List<HarassmentReport>> fetchAllReports() async {
+    try {
+      final token = supabase.auth.currentSession?.accessToken;
+      final url = '${ApiService.baseUrl}/harassment-reports/all';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body)['reports'];
+        return data.map((json) => HarassmentReport.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching all reports: $e');
       return [];
     }
   }
@@ -52,14 +75,10 @@ class HarassmentService {
     final url = '${ApiService.baseUrl}/harassment-reports';
     
     try {
-      final session = supabase.auth.currentSession;
-      final token = session?.accessToken;
+      final token = supabase.auth.currentSession?.accessToken;
       final userId = supabase.auth.currentUser?.id;
 
-      if (userId == null) {
-        print('User not logged in');
-        return false;
-      }
+      if (userId == null) return false;
 
       final body = {
         'title': title,
@@ -78,27 +97,42 @@ class HarassmentService {
         body: jsonEncode(body),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      }
-      print('Failed to create report: ${response.statusCode} - ${response.body}');
-      return false;
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('Error creating report: $e');
       return false;
     }
   }
 
-  /// Cancel a pending report manually
+  /// [STAFF ONLY] Update the status of a report
+  static Future<bool> updateReportStatus(String reportId, String newStatus) async {
+    try {
+      final token = supabase.auth.currentSession?.accessToken;
+      final url = '${ApiService.baseUrl}/harassment-reports/$reportId/status';
+
+      final response = await http.patch(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'status': newStatus}),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error updating status: $e');
+      return false;
+    }
+  }
+
+  /// Cancel a pending report manually (Student)
   static Future<bool> cancelReport(String reportId) async {
     try {
-      final session = supabase.auth.currentSession;
-      final token = session?.accessToken;
+      final token = supabase.auth.currentSession?.accessToken;
       final userId = supabase.auth.currentUser?.id;
 
-      if (userId == null) {
-        return false;
-      }
+      if (userId == null) return false;
 
       final url = '${ApiService.baseUrl}/harassment-reports/$reportId/cancel?user_id=$userId';
 
@@ -110,11 +144,7 @@ class HarassmentService {
         },
       );
 
-      if (response.statusCode == 200) {
-        return true;
-      }
-      print('Failed to cancel report: ${response.statusCode} - ${response.body}');
-      return false;
+      return response.statusCode == 200;
     } catch (e) {
       print('Error cancelling report: $e');
       return false;

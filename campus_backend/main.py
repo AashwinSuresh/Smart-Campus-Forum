@@ -10,7 +10,9 @@ from community import router as community_router
 from harassment import router as harassment_router
 from backup_lost_found import router as backup_lost_found_router
 
-from typing import Optional
+import firebase_admin
+from firebase_admin import credentials, messaging
+from typing import Optional, List
 
 app = FastAPI()
 
@@ -26,52 +28,62 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# # cred = credentials.Certificate("D:\Flutter study\mini project\campus_backend\serviceAccountKey.json")
-# # firebase_admin.initialize_app(cred)
-# db = firestore.client()
+
+# ── Firebase Initialization ──────────────────────────────────────────────────
+try:
+    cred_path = os.path.join(os.path.dirname(__file__), "service-account.json")
+    if os.path.exists(cred_path):
+        cred = credentials.Certificate(cred_path)
+        firebase_admin.initialize_app(cred)
+        print("✅ SUCCESS: Firebase Admin SDK initialized.")
+    else:
+        print("⚠️ WARNING: service-account.json NOT FOUND. Push notifications will fail.")
+except Exception as e:
+    print(f"❌ Firebase Init Error: {e}")
 
 #supabase
 load_dotenv()
 
-supabase_url = os.getenv("supabase_url")
-supabase_key = os.getenv("supabase_key")
-supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
-    "supabase_service_key"
-)
-supabase_url = "https://lynzclilcsykpakjezuv.supabase.co"
-supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5bnpjbGlsY3N5a3Bha2plenV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MjgxMzUsImV4cCI6MjA4NzUwNDEzNX0.DmjpHqrSu4WffjYCO2O-yK7sJMHonqkAC5g1Z9quQm4"
- 
+supabase_url = os.getenv("supabase_url") or "https://lynzclilcsykpakjezuv.supabase.co"
+supabase_key = os.getenv("supabase_key") or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5bnpjbGlsY3N5a3Bha2plenV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MjgxMzUsImV4cCI6MjA4NzUwNDEzNX0.DmjpHqrSu4WffjYCO2O-yK7sJMHonqkAC5g1Z9quQm4"
+supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("supabase_service_key")
+
+if not supabase_service_key or supabase_service_key == supabase_key:
+    print("⚠️ WARNING: SUPABASE_SERVICE_ROLE_KEY is missing or invalid! Admin features like creating users will FAIL.")
+else:
+    print("✅ SUCCESS: Supabase Service Role Key loaded.")
 
 supabase1: Client = create_client(supabase_url, supabase_service_key)
-supabase_url1 = "https://hmbfexybfgpmbrsisdfi.supabase.co"
-supabase_key1 = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtYmZleHliZmdwbWJyc2lzZGZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1ODU1ODMsImV4cCI6MjA4OTE2MTU4M30.zeEUk-kcmzadiimcTzejKPpAZDdBGRwOuXeA3B_gA2Q"
 
-supabase: Client = create_client(supabase_url1, supabase_key1)
+# Secondary Supabase (for specific features if needed)
+supabase_url_sec = "https://hmbfexybfgpmbrsisdfi.supabase.co"
+supabase_key_sec = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtYmZleHliZmdwbWJyc2lzZGZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1ODU1ODMsImV4cCI6MjA4OTE2MTU4M30.zeEUk-kcmzadiimcTzejKPpAZDdBGRwOuXeA3B_gA2Q"
+supabase: Client = create_client(supabase_url_sec, supabase_key_sec)
 
-class EventCreate(BaseModel):  #for events
+# ── Models ────────────────────────────────────────────────────────────────────
+
+class EtLabCredentials(BaseModel):
+    username:str
+    password:str
+
+class AdminCreateUser(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    role: str # 'staff' or 'club_rep'
+
+class EventCreate(BaseModel):
     title: str
     description: str
     venue: str
     event_date: str
     image_url: str
 
-#suraaa
+class FCMUpdate(BaseModel):
+    user_id: str
+    fcm_token: str
 
-
-class LostFoundItem(BaseModel):  # for lost and found
-    title: str
-    description: str
-    type: str          # "lost" or "found"
-    category: str
-    location: str
-    contact_info: str
-    posted_by: str
-    image_url: str = None  # optional
-
-class StatusUpdate(BaseModel):
-    status: str  # "open" or "resolved"
-
-class LostFoundItem(BaseModel): #for lost and found
+class LostFoundItem(BaseModel):
     title: str
     description: str
     type: str           # "lost" or "found"
@@ -79,114 +91,27 @@ class LostFoundItem(BaseModel): #for lost and found
     location: str
     contact_info: str
     posted_by: str
-    image_url: Optional[str] = None  # ← THIS ACCEPTS null properly
+    image_url: Optional[str] = None
 
-class EtLabCredentials(BaseModel):
-    username:str
-    password:str
+class StatusUpdate(BaseModel):
+    status: str
+
+# ── Authentication ─────────────────────────────────────────────────────────────
 
 ETLAB_URL = "https://sctce.etlab.in/user/login"
 
 @app.post("/login")
 async def login_to_etlab(data: EtLabCredentials):
-    session = requests.Session()
-    payload = {
-        "LoginForm[username]": data.username,
-        "LoginForm[password]": data.password,
-        "yt0": "Login" 
-    }
-    
-    try:
-        # 1. Verify with ETLAB
-        response = session.post(ETLAB_URL, data=payload, timeout=10)
-
-        if response.status_code == 200 and "Dashboard" in response.text:
-            # --- SCRAPING START ---
-            try:
-                from bs4 import BeautifulSoup
-                import re
-                
-                # 1. NAVIGATE TO STUDENT PROFILE
-                # This fetches your full profile page instead of the dashboard summary.
-                profile_res = session.get("https://sctce.etlab.in/student/profile", timeout=10)
-                print(f"DEBUG: Profile Page Status: {profile_res.status_code}")
-                
-                soup = BeautifulSoup(profile_res.text, 'html.parser')
-                
-                # 2. FETCH FULL NAME
-                # Selector confirmed from screenshots: Header (th) is "Name", value is next (td)
-                full_name = f"User {data.username}"
-                name_th = soup.find('th', string=re.compile(r'Name', re.I))
-                if name_th and name_th.find_next_sibling('td'):
-                    full_name = name_th.find_next_sibling('td').get_text(strip=True)
-                
-                # 3. FETCH DEPARTMENT / COURSE
-                # Look for labels like 'Course', 'Department', or 'Academic Info'
-                # 3. FETCH DEPARTMENT / COURSE
-                # Anchored regex to avoid matching 'Place of Birth'
-                department = "Pending"
-                dept_th = soup.find('th', string=re.compile(r'^\s*(Course|Department|Branch)\s*$', re.I))
-                if dept_th and dept_th.find_next_sibling('td'):
-                    department = dept_th.find_next_sibling('td').get_text(strip=True)
-                else:
-                    # Fallback: check strings for exact match
-                    dept_label = soup.find(string=re.compile(r'^\s*(Course|Department)\s*$', re.I))
-                    if dept_label and dept_label.find_next():
-                         department = dept_label.find_next().get_text(strip=True)
-
-                # 4. FETCH PROFILE IMAGE
-                # Selector confirmed from screenshots: Image has id="photo"
-                profile_pic_url = f"https://api.dicebear.com/7.x/avataaars/png?seed={data.username}"
-                img_elem = soup.find('img', id='photo') or soup.find('img', class_='span2')
-                if img_elem and 'src' in img_elem.attrs:
-                    src = img_elem['src']
-                    profile_pic_url = src if src.startswith('http') else f"https://sctce.etlab.in{src}"
-                
-            except Exception as scrape_err:
-                print(f"Scraping Warning Detail: {scrape_err}")
-                full_name = f"User {data.username}"
-                department = "Pending"
-                profile_pic_url = f"https://api.dicebear.com/7.x/avataaars/png?seed={data.username}"
-            # --- SCRAPING END ---
-            print(f"DEBUG SCRAPE: Name: {full_name}")
-            print(f"DEBUG SCRAPE: Dept: {department}")
-            print(f"DEBUG SCRAPE: Photo: {profile_pic_url}")
-
-            user_email = f"{data.username}@sctce.edu"
-            auth_res = None
-            
-            # ... authenticaion logic follows ...
-            try:
-                auth_res = supabase1.auth.sign_in_with_password({"email": user_email, "password": data.password})
-            except Exception:
-                try:
-                    supabase1.auth.admin.create_user({
-                        "email": user_email,
-                        "password": data.password,
-                        "user_metadata": {"full_name": full_name, "profile_pic": profile_pic_url},
-                        "email_confirm": True
-                    })
-                    auth_res = supabase1.auth.sign_in_with_password({"email": user_email, "password": data.password})
-                except Exception as create_err:
-                    users_list = supabase1.auth.admin.list_users()
-                    target_user = next((u for u in users_list if u.email == user_email), None)
-                    if target_user:
-                        supabase1.auth.admin.update_user_by_id(target_user.id, attributes={'password': data.password})
-                        auth_res = supabase1.auth.sign_in_with_password({"email": user_email, "password": data.password})
-                    else: raise create_err
-
+    # --- DUAL-MODE LOGIN: Check for Email vs ETLAB ID ---
+    if "@" in data.username:
+        try:
+            auth_res = supabase1.auth.sign_in_with_password({
+                "email": data.username,
+                "password": data.password
+            })
             user_id = auth_res.user.id
-
-            # 5. Sync to systematic 'users' table
-            supabase1.table("users").upsert({
-                "id": user_id,
-                "etlab_id": data.username,
-                "full_name": full_name,
-                "department": department, 
-                "profile_pic_url": profile_pic_url
-            }).execute()
-
-            # Return the session object which Flutter's ApiService expects
+            user_profile = supabase1.table("users").select("*").eq("id", user_id).single().execute()
+            
             clean_session = {
                 "access_token": auth_res.session.access_token,
                 "refresh_token": auth_res.session.refresh_token,
@@ -195,163 +120,230 @@ async def login_to_etlab(data: EtLabCredentials):
             
             return {
                 "status": "success",
-                "message": "Authenticated with ETLAB and Supabase",
+                "message": "Authenticated with Supabase",
                 "session": clean_session,
-                "user": {
-                    "id": user_id,
-                    "name": full_name
-                }
+                "user": user_profile.data
             }
-            
+        except Exception as e:
+            print(f"Internal Login Error: {e}")
+            raise HTTPException(status_code=401, detail="Invalid Email or Password")
+
+    # --- ETLAB LOGIN (Students) ---
+    session = requests.Session()
+    payload = {
+        "LoginForm[username]": data.username,
+        "LoginForm[password]": data.password,
+        "yt0": "Login" 
+    }
+    
+    try:
+        response = session.post(ETLAB_URL, data=payload, timeout=15)
+
+        if response.status_code == 200 and "Dashboard" in response.text:
+            try:
+                from bs4 import BeautifulSoup
+                import re
+                
+                profile_res = session.get("https://sctce.etlab.in/student/profile", timeout=10)
+                soup = BeautifulSoup(profile_res.text, 'html.parser')
+                
+                # Fetch student profile data
+                full_name = f"User {data.username}"
+                name_th = soup.find('th', string=re.compile(r'Name', re.I))
+                if name_th and name_th.find_next_sibling('td'):
+                    full_name = name_th.find_next_sibling('td').get_text(strip=True)
+                
+                department = "Pending"
+                dept_th = soup.find('th', string=re.compile(r'^\s*(Course|Department|Branch)\s*$', re.I))
+                if dept_th and dept_th.find_next_sibling('td'):
+                    department = dept_th.find_next_sibling('td').get_text(strip=True)
+                
+                profile_pic_url = f"https://api.dicebear.com/7.x/avataaars/png?seed={data.username}"
+                img_elem = soup.find('img', id='photo') or soup.find('img', class_='span2')
+                if img_elem and 'src' in img_elem.attrs:
+                    src = img_elem['src']
+                    profile_pic_url = src if src.startswith('http') else f"https://sctce.etlab.in{src}"
+                
+                # ── 🔍 SYNC STRATEGY: Auth First, Profile Second ──────────────────
+                dummy_email = f"{data.username}@sctce.ac.in"
+                
+                # Check if user already has a profile mapped
+                existing_user = supabase1.table("users").select("id").eq("etlab_id", data.username).execute()
+                known_id = existing_user.data[0]["id"] if existing_user.data else None
+
+                # 1. ⚡ STEP 1: Attempt to Authenticate First
+                try:
+                    auth_res = supabase1.auth.sign_in_with_password({
+                        "email": dummy_email,
+                        "password": data.password
+                    })
+                except Exception as sign_in_error:
+                    # Authentication failed. This could be due to wrong password OR user doesn't exist yet.
+                    users_res = supabase1.auth.admin.list_users()
+                    ulist = getattr(users_res, 'users', users_res)
+                    target = next((u for u in ulist if u.email == dummy_email), None)
+                    
+                    if not target:
+                        # User doesn't exist, create them!
+                        try:
+                            supabase1.auth.admin.create_user({
+                                "email": dummy_email,
+                                "password": data.password,
+                                "user_metadata": {"full_name": full_name},
+                                "email_confirm": True
+                            })
+                            # Sign in to get the session token
+                            auth_res = supabase1.auth.sign_in_with_password({
+                                "email": dummy_email,
+                                "password": data.password
+                            })
+                        except Exception as create_error:
+                            print(f"CRITICAL: Failed to create new user - {create_error}")
+                            raise HTTPException(status_code=500, detail=f"User creation failed: {create_error}")
+                    else:
+                        # User exists, but password was wrong. Try to force sync the password!
+                        try:
+                            supabase1.auth.admin.update_user_by_id(target.id, {"password": data.password})
+                            auth_res = supabase1.auth.sign_in_with_password({
+                                "email": dummy_email,
+                                "password": data.password
+                            })
+                        except Exception as e:
+                            print(f"⚠️ Password Sync Warning: {e}")
+                            raise HTTPException(status_code=401, detail="ETLAB Login ok, but failed to sync internal authentication.")
+
+                user_id = auth_res.user.id
+                print(f"DEBUG SYNC: Login OK for {data.username}. Auth ID: {user_id}")
+
+                # ── 🚨 DEV DATA REPAIR: Fix Identity Mismatches ─────────────
+                if known_id and known_id != user_id:
+                    print(f"⚠️ ID Mismatch Detected! Migrating data from {known_id} to {user_id}...")
+                    def migrate_table(table, column):
+                        try:
+                            res = supabase1.table(table).update({column: user_id}).eq(column, known_id).execute()
+                            print(f" -> Migrated {table}")
+                        except Exception as e:
+                            print(f" -> Failed {table}: {e}")
+                    
+                    migrate_table("posts", "author_id")
+                    migrate_table("comments", "user_id")
+                    migrate_table("likes", "user_id")
+                    migrate_table("harassment_reports", "reporter_id")
+                    migrate_table("lost_and_found", "posted_by")
+
+                    try:
+                        supabase1.table("users").delete().eq("id", known_id).execute()
+                        print(" -> Purged old ghost profile.")
+                    except Exception as e:
+                        print(f" -> Failed to purge old profile: {e}")
+
+                # 3. ⚡ STEP 3: Sync Profile Table
+                upsert_res = supabase1.table("users").upsert({
+                    "id": user_id, 
+                    "etlab_id": data.username,
+                    "full_name": full_name,
+                    "department": department,
+                    "profile_pic_url": profile_pic_url
+                }, on_conflict="etlab_id").execute()
+                
+                final_user_profile = upsert_res.data[0] if upsert_res.data else {"id": user_id, "full_name": full_name}
+
+                # Prepare session packet
+                clean_session = {
+                    "access_token": auth_res.session.access_token,
+                    "refresh_token": auth_res.session.refresh_token,
+                    "expires_at": auth_res.session.expires_at
+                }
+
+                print(f"✅ SUCCESS: Profile Ready for student {user_id}")
+                return {
+                    "status": "success",
+                    "session": clean_session,
+                    "user": final_user_profile
+                }
+                
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"CRITICAL PROFILE SYNC ERROR: {e}")
+                raise HTTPException(status_code=500, detail=f"Database Profile Sync Failed: {str(e)}")
         else:
             raise HTTPException(status_code=401, detail="Invalid ETLAB credentials")
-
     except Exception as e:
-        print(f"Login Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+@app.post("/admin/create-user")
+async def admin_create_user(data: AdminCreateUser):
+    print(f"DEBUG ADMIN: Handshaking {data.email}")
+    try:
+        # Create Auth user (or ignore if exists)
+        try:
+            auth_res = supabase1.auth.admin.create_user({
+                "email": data.email,
+                "password": data.password,
+                "user_metadata": {"full_name": data.full_name},
+                "email_confirm": True
+            })
+            user_id = auth_res.user.id
+        except Exception as auth_err:
+            if "already been registered" in str(auth_err):
+                # Fetch UID safely using the email
+                # admin.list_users is used sparingly to avoid 403.
+                users_res = supabase1.auth.admin.list_users()
+                ulist = getattr(users_res, 'users', users_res)
+                target = next((u for u in ulist if u.email == data.email), None)
+                if not target: raise auth_err
+                user_id = target.id
+            else: raise auth_err
+
+        # Upsert with ID as primary key
+        supabase1.table("users").upsert({
+            "id": user_id,
+            "etlab_id": f"INTERNAL_{data.email}", 
+            "full_name": data.full_name,
+            "role": data.role.lower(),
+            "profile_pic_url": f"https://api.dicebear.com/7.x/avataaars/png?seed={data.full_name}"
+        }, on_conflict="id").execute()
+        
+        return {"status": "success", "message": f"Setup {data.role} account."}
+    except Exception as e:
+        print(f"CRITICAL ADMIN ERROR: {e}")
+        raise HTTPException(status_code=500, detail=f"Setup Failed: {str(e)}")
+
 @app.get("/user/profile/{user_id}")
 async def get_user_profile(user_id: str):
+    response = supabase1.table("users").select("*").eq("id", user_id).execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "success", "user": response.data[0]}
+
+@app.post("/user/update-fcm")
+async def update_fcm_token(data: FCMUpdate):
     try:
-        # Query the systematic 'users' table
-        response = supabase1.table("users").select("*").eq("id", user_id).execute()
-        
-        if not response.data:
-            raise HTTPException(status_code=404, detail="User not found")
-            
-        return {
-            "status": "success", 
-            "user": response.data[0]
-        }
+        supabase1.table("users").update({"fcm_token": data.fcm_token}).eq("id", data.user_id).execute()
+        return {"status": "success", "message": "FCM Token updated"}
     except Exception as e:
-        print(f"Profile Fetch Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
-    
 
-# @app.get("/admin/logs")
-# async def get_all_logs():
-#     try:
-#         logs_ref = db.collection("login_logs")
-
-#         docs = logs_ref.stream()
-
-#         all_logs = []
-
-#         for doc in docs:
-#             log_data = doc.to_dict()
-
-#             if "login_time" in log_data:
-#                 log_data["login_time"] = log_data["login_time"].strftime("%Y-%m-%d %H:%M:%S")
-            
-#             all_logs.append(log_data)
-
-#         return {"status": "success", "logs": all_logs}
-#     except Exception as e:
-        
-#         raise HTTPException(status_code=500, detail=str(e))
-
-
-
-# Logic: We fetch all events and filter them in Python for flexibility
-# @app.get("/events")
-# async def get_events(search: str = None, date: str = None):
-#     try:
-#         events_ref = db.collection("events")
-#         docs = events_ref.stream()
-#         results = []
-
-#         for doc in docs:
-#             event = doc.to_dict()
-#             event["id"] = doc.id
-            
-#             # 1. Date Filter: Comparing the string from UI to DB
-#             if date and date != "All" and event.get("date") != date:
-#                 continue
-            
-#             # 2. Search Logic: Checking title and description
-#             if search:
-#                 s = search.lower()
-#                 if s not in event.get("title", "").lower() and s not in event.get("description", "").lower():
-#                     continue
-            
-#             results.append(event)
-#         return {"status": "success", "events": results}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-# @app.get("/events")
-# async def get_events(search: str = None, date: str = None, page: int = 1, limit: int = 5):
-#     try:
-#         query = db.collection("events")
-
-#         if date and date != "All":
-#             query = query.where("date", "==", date)
-
-#         skip = (page - 1) * limit
-#         docs = query.offset(skip).limit(limit).stream()
-
-#         query = query.order_by("date")
-
-#         docs = query.stream()
-#         results = []
-
-#         for doc in docs:
-#             event = doc.to_dict()
-#             event["id"] = doc.id
-            
-#             if search:
-#                 s = search.strip().lower()
-#                 if s not in event.get("title", "").lower() and s not in event.get("description", "").lower():
-#                     continue
-            
-#             results.append(event)
-            
-#         return {"status": "success", "events": results}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
+# ── Events ────────────────────────────────────────────────────────────────────
 
 @app.get("/events")
 async def get_events(search: str = None, date : str = None, page : int =1, limit: int = 5):
     try:
         query = supabase1.table("events").select("*")
-
         if date and date != "All":
             query = query.gte("event_date", f"{date}T00:00:00")\
                          .lt("event_date", f"{date}T23:59:59")
-        
         start = (page-1)* limit
         end = start + limit -1
-        query = query.range(start, end).order("event_date")
-
         response = query.order("event_date", desc=False).range(start, end).execute()
         events = response.data
-
         if search:
             s = search.strip().lower()
-            events = [
-                e for e in events
-                if s in e.get("title", "").lower() or s in e.get("description", "").lower()
-            ]
+            events = [e for e in events if s in e.get("title", "").lower() or s in e.get("description", "").lower()]
         return {"status": "success", "event": events}
     except Exception as e:
-        print(f"DEBUG ERROR: {e}")
-        raise HTTPException(status_code=500,detail=str(e))
-
-# @app.get("/events")
-# async def get_events(search: str = None, date: str = None, page: int = 1, limit: int = 5):
-#     try:
-#         # 1. SIMPLEST POSSIBLE QUERY
-#         # We use .from_("events") or .table("events")
-#         response = supabase.table("events").select("*").execute()
-        
-#         print(f"RAW DATA FROM SUPABASE: {response.data}") # CHECK YOUR TERMINAL
-        
-#         return {"status": "success", "events": response.data}
-
-#     except Exception as e:
-#         print(f"STILL FAILING: {e}")
-#         raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/events_post")
 async def add_event(event: EventCreate):
@@ -363,47 +355,52 @@ async def add_event(event: EventCreate):
             "event_date": event.event_date,
             "image_url": event.image_url
         }
+        # 1. Insert into database
         response = supabase1.table("events").insert(data).execute()
+        
+        # 2. 📡 Broadcast Push Notification
+        try:
+            tokens_res = supabase1.table("users").select("fcm_token").not_.is_("fcm_token", "null").execute()
+            tokens = [r["fcm_token"] for r in tokens_res.data if r.get("fcm_token")]
+            
+            if tokens:
+                message = messaging.MulticastMessage(
+                    notification=messaging.Notification(
+                        title=f"New Event: {event.title}",
+                        body=f"Join us at {event.venue} on {event.event_date}!",
+                    ),
+                    tokens=tokens,
+                )
+                messaging.send_multicast(message)
+                print(f"✅ SUCCESS: Broadcasted event notification to {len(tokens)} users.")
+        except Exception as fcm_err:
+            print(f"⚠️ FCM Broadcast Error: {fcm_err}")
+
         return {"status": "success", "data": response.data}
     except Exception as e:
-        print(f"Server Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-#suraa
+# ── Lost and Found ────────────────────────────────────────────────────────────
 
 @app.get("/lost-found")
 async def get_lost_found_items(type: str = None, category: str = None, status: str = None):
     try:
         query = supabase.table("lost_and_found").select("*").order("created_at", desc=True)
-
-        if type:
-            query = query.eq("type", type)
-        if category:
-            query = query.eq("category", category)
-        if status:
-            query = query.eq("status", status)
-
+        if type: query = query.eq("type", type)
+        if category: query = query.eq("category", category)
+        if status: query = query.eq("status", status)
         response = query.execute()
         return {"status": "success", "items": response.data}
     except Exception as e:
-        print(f"DEBUG ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# GET single item by ID
 @app.get("/lost-found/{item_id}")
 async def get_lost_found_item(item_id: str):
-    try:
-        response = supabase.table("lost_and_found").select("*").eq("id", item_id).execute()
-        if not response.data:
-            raise HTTPException(status_code=404, detail="Item not found")
-        return {"status": "success", "item": response.data[0]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    response = supabase.table("lost_and_found").select("*").eq("id", item_id).execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"status": "success", "item": response.data[0]}
 
-
-# POST — report a new lost or found item
 @app.post("/lost-found")
 async def create_lost_found_item(item: LostFoundItem):
     try:
@@ -416,48 +413,17 @@ async def create_lost_found_item(item: LostFoundItem):
             "contact_info": item.contact_info,
             "posted_by": item.posted_by,
             "image_url": item.image_url,
-            "status": "open"
+            "status": "active"
         }
         response = supabase.table("lost_and_found").insert(data).execute()
-        return {"status": "success", "item": response.data[0]}
+        return {"status": "success", "data": response.data}
     except Exception as e:
-        print(f"Server Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# PATCH — mark item as resolved or reopen it
 @app.patch("/lost-found/{item_id}/status")
-async def update_lost_found_status(item_id: str, update: StatusUpdate):
+async def update_item_status(item_id: str, data: StatusUpdate):
     try:
-        response = supabase.table("lost_and_found")\
-            .update({"status": update.status})\
-            .eq("id", item_id)\
-            .execute()
-        if not response.data:
-            raise HTTPException(status_code=404, detail="Item not found")
-        return {"status": "success", "item": response.data[0]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# DELETE — remove a post
-@app.delete("/lost-found/{item_id}")
-async def delete_lost_found_item(item_id: str):
-    try:
-        supabase.table("lost_and_found").delete().eq("id", item_id).execute()
-        return {"status": "success", "message": "Item deleted"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# GET — search by keyword in title or description
-@app.get("/lost-found-search")
-async def search_lost_found(q: str):
-    try:
-        response = supabase.table("lost_and_found")\
-            .select("*")\
-            .ilike("title", f"%{q}%")\
-            .execute()
-        return {"status": "success", "items": response.data}
+        response = supabase.table("lost_and_found").update({"status": data.status}).eq("id", item_id).execute()
+        return {"status": "success", "data": response.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

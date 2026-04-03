@@ -1,4 +1,5 @@
 import 'package:campusapp/core/app_colors.dart';
+import 'package:campusapp/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class CustomAiamtedNavBar extends StatelessWidget {
@@ -47,8 +48,13 @@ class CustomAiamtedNavBar extends StatelessWidget {
               children: [
                 _navItem(Icons.groups_outlined, 0, "Community"),
                 _navItem(Icons.event_note, 1, "Events"),
-                _navItem(Icons.search, 2, "Lost & Found"),
-                _navItem(Icons.post_add_rounded, 3, "Report"),
+                _navItem(Icons.search, 2, "L & F"),
+                if (ApiService.currentUserRole == 'admin')
+                  _navItem(Icons.admin_panel_settings_outlined, 3, "Admin")
+                else if (ApiService.currentUserRole == 'staff')
+                  _navItem(Icons.security_outlined, 3, "Monitor")
+                else
+                  _navItem(Icons.post_add_rounded, 3, "Report"),
               ],
             ),
           ],
