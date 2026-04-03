@@ -31,7 +31,7 @@ app.add_middleware(
 
 # ── Firebase Initialization ──────────────────────────────────────────────────
 try:
-    cred_path = os.path.join(os.path.dirname(__file__), "service-account.json")
+    cred_path = os.path.join(os.path.dirname(__file__), "serviceaccount.json")
     if os.path.exists(cred_path):
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)

@@ -10,8 +10,8 @@ __pycache__/
 
 campus_backend\.env
 
-
 campus_backend/serviceAccountKey.json
+campus_backend/serviceaccount.json
 campus_backend/service-account.json
 
 /campus_frontend/build/
