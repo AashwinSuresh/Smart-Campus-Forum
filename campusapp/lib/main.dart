@@ -1,8 +1,10 @@
 import 'package:campusapp/core/app_colors.dart';
 import 'package:campusapp/pages/dashboard.dart';
+import 'package:campusapp/pages/harassment/my_reports_page.dart';
 import 'package:campusapp/pages/login_page.dart';
 import 'package:campusapp/pages/splashScreen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:campusapp/pages/backup_lost_found/backup_lost_found_list_page.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 //import 'package:campusapp/pages/study_page.dart';
 import 'package:flutter/material.dart';
@@ -12,12 +14,12 @@ import 'package:flutter/material.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: ".env");
+    await dotenv.load(fileName: ".env");
 
-  await Supabase.initialize(
-    url: dotenv.env['supabase_url'] ?? '',
-    anonKey: dotenv.env['supabase_key'] ?? '',
-  );
+    await Supabase.initialize(
+      url: dotenv.env['supabase_url'] ?? '',
+      anonKey: dotenv.env['supabase_key'] ?? '',
+    );
   runApp(const MyApp());
 }
 
@@ -61,6 +63,7 @@ class MyApp extends StatelessWidget {
       // 2. Dynamic Home Selection
       // If session is NOT null, jump straight to Dashboard.
       home: SplashScreen(),
+      //home: BackupLostFoundListPage(),
     );
   }
 }

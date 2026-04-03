@@ -1,6 +1,7 @@
+import 'package:campusapp/pages/backup_lost_found/backup_lost_found_list_page.dart';
 import 'package:campusapp/pages/community_page.dart';
 import 'package:campusapp/pages/events_page.dart';
-import 'package:campusapp/screens/lost_found_screen.dart';
+import 'package:campusapp/pages/harassment/my_reports_page.dart';
 import 'package:campusapp/widgets/custom_nav_bar.dart';
 import 'package:flutter/material.dart';
 
@@ -16,10 +17,8 @@ class _DashboardState extends State<Dashboard> {
   final List<Widget> _pages = [
     const CommunityPage(),
     const EventsPage(),
-    const LostFoundScreen(),
-    const Center(
-      child: Text("Report page", style: TextStyle(color: Colors.white)),
-    ),
+    const BackupLostFoundListPage(),
+    const MyReportsPage(),
   ];
   @override
   Widget build(BuildContext context) {
