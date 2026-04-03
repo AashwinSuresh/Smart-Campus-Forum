@@ -16,11 +16,23 @@ class CommunityPage extends StatefulWidget {
 class _CommunityPageState extends State<CommunityPage> {
   List<PostModel> _posts = [];
   bool _isLoading = true;
+  Map<String, dynamic>? _userProfile;
 
   @override
   void initState() {
     super.initState();
     _loadPosts();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final userId = ApiService.supabase.auth.currentUser?.id;
+    if (userId != null) {
+      final profile = await ApiService.fetchUserProfile(userId);
+      if (mounted) {
+        setState(() => _userProfile = profile);
+      }
+    }
   }
 
   Future<void> _loadPosts() async {
@@ -60,6 +72,7 @@ class _CommunityPageState extends State<CommunityPage> {
               radius: 18,
               backgroundColor: Colors.white10,
               backgroundImage: NetworkImage(
+                _userProfile?['profile_pic_url'] ?? 
                 'https://api.dicebear.com/7.x/avataaars/png?seed=${ApiService.supabase.auth.currentUser?.id ?? "anon"}',
               ),
             ),

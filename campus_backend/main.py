@@ -30,10 +30,6 @@ app.add_middleware(
 # # firebase_admin.initialize_app(cred)
 # db = firestore.client()
 
-
-
-
-
 #supabase
 load_dotenv()
 
@@ -85,9 +81,6 @@ class LostFoundItem(BaseModel): #for lost and found
     posted_by: str
     image_url: Optional[str] = None  # ← THIS ACCEPTS null properly
 
-
-
-
 class EtLabCredentials(BaseModel):
     username:str
     password:str
@@ -108,55 +101,79 @@ async def login_to_etlab(data: EtLabCredentials):
         response = session.post(ETLAB_URL, data=payload, timeout=10)
 
         if response.status_code == 200 and "Dashboard" in response.text:
-            # Fix: Splitting logic for the name
-            full_name = f"User {data.username}" 
-            if "Welcome," in response.text:
-                try:
-                    # Fix: Correctly indexing the split list before splitting again
-                    full_name = response.text.split("Welcome,").split("!").strip()
-                except (IndexError, AttributeError):
-                    pass
+            # --- SCRAPING START ---
+            try:
+                from bs4 import BeautifulSoup
+                import re
+                
+                # 1. NAVIGATE TO STUDENT PROFILE
+                # This fetches your full profile page instead of the dashboard summary.
+                profile_res = session.get("https://sctce.etlab.in/student/profile", timeout=10)
+                print(f"DEBUG: Profile Page Status: {profile_res.status_code}")
+                
+                soup = BeautifulSoup(profile_res.text, 'html.parser')
+                
+                # 2. FETCH FULL NAME
+                # Selector confirmed from screenshots: Header (th) is "Name", value is next (td)
+                full_name = f"User {data.username}"
+                name_th = soup.find('th', string=re.compile(r'Name', re.I))
+                if name_th and name_th.find_next_sibling('td'):
+                    full_name = name_th.find_next_sibling('td').get_text(strip=True)
+                
+                # 3. FETCH DEPARTMENT / COURSE
+                # Look for labels like 'Course', 'Department', or 'Academic Info'
+                # 3. FETCH DEPARTMENT / COURSE
+                # Anchored regex to avoid matching 'Place of Birth'
+                department = "Pending"
+                dept_th = soup.find('th', string=re.compile(r'^\s*(Course|Department|Branch)\s*$', re.I))
+                if dept_th and dept_th.find_next_sibling('td'):
+                    department = dept_th.find_next_sibling('td').get_text(strip=True)
+                else:
+                    # Fallback: check strings for exact match
+                    dept_label = soup.find(string=re.compile(r'^\s*(Course|Department)\s*$', re.I))
+                    if dept_label and dept_label.find_next():
+                         department = dept_label.find_next().get_text(strip=True)
+
+                # 4. FETCH PROFILE IMAGE
+                # Selector confirmed from screenshots: Image has id="photo"
+                profile_pic_url = f"https://api.dicebear.com/7.x/avataaars/png?seed={data.username}"
+                img_elem = soup.find('img', id='photo') or soup.find('img', class_='span2')
+                if img_elem and 'src' in img_elem.attrs:
+                    src = img_elem['src']
+                    profile_pic_url = src if src.startswith('http') else f"https://sctce.etlab.in{src}"
+                
+            except Exception as scrape_err:
+                print(f"Scraping Warning Detail: {scrape_err}")
+                full_name = f"User {data.username}"
+                department = "Pending"
+                profile_pic_url = f"https://api.dicebear.com/7.x/avataaars/png?seed={data.username}"
+            # --- SCRAPING END ---
+            print(f"DEBUG SCRAPE: Name: {full_name}")
+            print(f"DEBUG SCRAPE: Dept: {department}")
+            print(f"DEBUG SCRAPE: Photo: {profile_pic_url}")
 
             user_email = f"{data.username}@sctce.edu"
             auth_res = None
-
+            
+            # ... authenticaion logic follows ...
             try:
-                # 2. Try to Sign In (if user already exists)
-                auth_res = supabase1.auth.sign_in_with_password({
-                    "email": user_email, 
-                    "password": data.password
-                })
+                auth_res = supabase1.auth.sign_in_with_password({"email": user_email, "password": data.password})
             except Exception:
-                # 3. Create New User if Sign In fails
                 try:
-                    # Admin create doesn't return a session, just the user
                     supabase1.auth.admin.create_user({
                         "email": user_email,
                         "password": data.password,
-                        "user_metadata": {"full_name": full_name},
+                        "user_metadata": {"full_name": full_name, "profile_pic": profile_pic_url},
                         "email_confirm": True
                     })
-                    # MUST sign in after creation to get the Session object for Flutter
-                    auth_res = supabase1.auth.sign_in_with_password({
-                        "email": user_email, 
-                        "password": data.password
-                    })
+                    auth_res = supabase1.auth.sign_in_with_password({"email": user_email, "password": data.password})
                 except Exception as create_err:
-                    # 4. Fallback: Password mismatch on existing account
                     users_list = supabase1.auth.admin.list_users()
                     target_user = next((u for u in users_list if u.email == user_email), None)
-                    
                     if target_user:
-                        supabase1.auth.admin.update_user_by_id(
-                            target_user.id, 
-                            attributes={'password': data.password}
-                        )
-                        auth_res = supabase1.auth.sign_in_with_password({
-                            "email": user_email, 
-                            "password": data.password
-                        })
-                    else:
-                        raise create_err
+                        supabase1.auth.admin.update_user_by_id(target_user.id, attributes={'password': data.password})
+                        auth_res = supabase1.auth.sign_in_with_password({"email": user_email, "password": data.password})
+                    else: raise create_err
 
             user_id = auth_res.user.id
 
@@ -165,7 +182,8 @@ async def login_to_etlab(data: EtLabCredentials):
                 "id": user_id,
                 "etlab_id": data.username,
                 "full_name": full_name,
-                "department": "Pending", 
+                "department": department, 
+                "profile_pic_url": profile_pic_url
             }).execute()
 
             # Return the session object which Flutter's ApiService expects

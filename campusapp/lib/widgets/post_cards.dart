@@ -58,9 +58,10 @@ class _PostCardState extends State<PostCard> {
               if (!widget.isDetails) ...[
                 Row(
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 15,
-                      // add image
+                      backgroundColor: Colors.white10,
+                      backgroundImage: NetworkImage(widget.post.userProfilePic),
                     ),
                     const SizedBox(width: 10),
                     Expanded(

@@ -202,12 +202,17 @@ class ApiService {
       if (response.statusCode == 200) {
         final List posts = jsonDecode(response.body)['posts'];
         return posts.map((row) {
+          final author = row['author'];
           final authorId = row['author_id'] as String? ?? 'anonymous';
+          final authorName = author != null ? author['full_name'] as String : 'Campus User';
+          final authorPic = (author != null && author['profile_pic_url'] != null)
+              ? author['profile_pic_url'] as String
+              : 'https://api.dicebear.com/7.x/avataaars/png?seed=$authorId';
+
           return PostModel(
             id: row['id'] as String,
-            userName: 'Campus User',
-            userProfilePic:
-                'https://api.dicebear.com/7.x/avataaars/png?seed=$authorId',
+            userName: authorName,
+            userProfilePic: authorPic,
             postedTime: DateTime.parse(row['created_at'] as String),
             title: row['title'] as String? ?? '',
             content: row['content'] as String? ?? '',
@@ -258,15 +263,20 @@ class ApiService {
       if (response.statusCode == 200) {
         final List raw = jsonDecode(response.body)['comments'];
         final flat = raw.map<CommentModel>((row) {
+          final author = row['author'];
           final authorId = row['author_id'] as String? ?? 'anonymous';
+          final authorName = author != null ? author['full_name'] as String : 'Campus User';
+          final authorPic = (author != null && author['profile_pic_url'] != null)
+              ? author['profile_pic_url'] as String
+              : 'https://api.dicebear.com/7.x/avataaars/png?seed=$authorId';
+
           return CommentModel(
             id: row['id'] as String,
             postId: row['post_id'] as String,
             parentId: row['parent_comment_id'] as String?,
             authorId: authorId,
-            userName: 'Campus User',
-            profilePic:
-                'https://api.dicebear.com/7.x/avataaars/png?seed=$authorId',
+            userName: authorName,
+            profilePic: authorPic,
             text: row['content'] as String? ?? '',
             createdAt: DateTime.parse(row['created_at'] as String),
           );

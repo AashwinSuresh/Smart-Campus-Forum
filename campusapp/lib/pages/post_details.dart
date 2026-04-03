@@ -97,7 +97,11 @@ class _PostDetailPageState extends State<PostDetailPage> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircleAvatar(radius: 14, backgroundColor: Colors.orange),
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: Colors.white10,
+              backgroundImage: NetworkImage(widget.post.userProfilePic),
+            ),
             const SizedBox(width: 8),
             Text(
               widget.post.userName,

@@ -39,8 +39,8 @@ async def get_posts():
     """Return all community posts ordered by newest first."""
     try:
         response = (
-            supabase.table("posts")
-            .select("*")
+            supabase.from_("posts")
+            .select("*, author:users(full_name, profile_pic_url)")
             .order("created_at", desc=True)
             .execute()
         )
@@ -80,8 +80,8 @@ async def get_comments(post_id: str):
     """
     try:
         response = (
-            supabase.table("comments")
-            .select("*")
+            supabase.from_("comments")
+            .select("*, author:users(full_name, profile_pic_url)")
             .eq("post_id", post_id)
             .order("created_at", desc=False)
             .execute()

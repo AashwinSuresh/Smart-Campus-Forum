@@ -49,7 +49,8 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final userEmail = ApiService.supabase.auth.currentUser?.email ?? 'N/A';
-    final profilePic = 'https://api.dicebear.com/7.x/avataaars/png?seed=${ApiService.supabase.auth.currentUser?.id ?? "anon"}';
+    final profilePic = _userProfile?['profile_pic_url'] ?? 
+        'https://api.dicebear.com/7.x/avataaars/png?seed=${ApiService.supabase.auth.currentUser?.id ?? "anon"}';
 
     return Scaffold(
       backgroundColor: Colors.black,
