@@ -3,10 +3,12 @@ import 'package:campusapp/core/app_colors.dart';
 import 'package:campusapp/models/event_model.dart';
 import 'package:campusapp/pages/create_event_page.dart';
 import 'package:campusapp/services/api_service.dart';
+import 'package:campusapp/services/cache_service.dart';
 import 'package:campusapp/widgets/event_card.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
 
 class EventsPage extends StatefulWidget {
   const EventsPage({super.key});
@@ -32,6 +34,24 @@ class EventsPageState extends State<EventsPage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    // 1. Load from cache instantly
+    final cached = CacheService.getCachedEvents();
+    if (cached.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _allEvents = cached
+              .map((json) => EventModel.fromJson(Map<String, dynamic>.from(json)))
+              .toList();
+          // We don't increment page here because we still want to fetch Page 1 from network to sync
+        });
+      }
+    }
+    
+    // 2. Then proceed with normal pagination fetch
     _fetchNextPage();
   }
 
@@ -455,47 +475,51 @@ class EventsPageState extends State<EventsPage> {
   }
 
   Widget _buildShimmerCard() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      height: 120, // Match your EventCard height
-      decoration: BoxDecoration(
-        color: AppColors.cardGrey,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          // Ghost Image
-          Container(
-            width: 75,
-            height: 75,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[900]!,
+      highlightColor: Colors.grey[800]!,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        height: 120, // Match your EventCard height
+        decoration: BoxDecoration(
+          color: AppColors.cardGrey,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            // Ghost Image
+            Container(
+              width: 75,
+              height: 75,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Ghost Text
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 150,
-                  height: 20,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: 100,
-                  height: 14,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-              ],
+            const SizedBox(width: 12),
+            // Ghost Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 150,
+                    height: 20,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 100,
+                    height: 14,
+                    color: Colors.white,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

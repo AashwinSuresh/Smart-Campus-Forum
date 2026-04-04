@@ -6,6 +6,7 @@ import 'package:campusapp/models/post_model.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:campusapp/services/cache_service.dart';
 
 class ApiService {
   static String get baseUrl => dotenv.env['backend_url'] ?? "http://10.141.4.152:8000";
@@ -19,6 +20,10 @@ class ApiService {
     int page = 1,
     int limit = 5,
   }) async {
+    // 1. If we are on the first page and no search/date filters, try to return cache first?
+    // Actually, we'll let the UI handle the "instant cache" part.
+    // Here we focus on: Network fetch -> Save to Cache.
+
     String urlStr = "$baseUrl/events?page=$page&limit=$limit&";
     if (search != null) urlStr += "search=$search&";
     if (date != null) urlStr += "date=$date";
@@ -27,10 +32,10 @@ class ApiService {
       final response = await http.get(Uri.parse(urlStr));
       if (response.statusCode == 200) {
         List data = jsonDecode(response.body)['event'];
-        return data
+        final events = data
             .map(
               (json) => EventModel(
-                id: json['id'],
+                id: json['id'].toString(),
                 title: json['title'],
                 description: json['description'],
                 image_url: json['image_url'],
@@ -39,11 +44,23 @@ class ApiService {
               ),
             )
             .toList();
+        
+        // Save to cache (only for the first page of default results)
+        if (page == 1 && search == null && date == null) {
+          await CacheService.saveEvents(events.map((e) => e.toJson()).toList());
+        }
+        
+        return events;
       }
-      return [];
+      return _getFallbackEvents();
     } catch (e) {
-      return [];
+      return _getFallbackEvents();
     }
+  }
+
+  static List<EventModel> _getFallbackEvents() {
+    final cached = CacheService.getCachedEvents();
+    return cached.map((json) => EventModel.fromJson(Map<String, dynamic>.from(json))).toList();
   }
 
   static Future<EventModel?> fetchEventById(String id) async {
@@ -226,8 +243,8 @@ class ApiService {
     try {
       final response = await http.get(Uri.parse('$baseUrl/community/posts'));
       if (response.statusCode == 200) {
-        final List posts = jsonDecode(response.body)['posts'];
-        return posts.map((row) {
+        final List postsRaw = jsonDecode(response.body)['posts'];
+        final posts = postsRaw.map((row) {
           final author = row['author'];
           final authorId = row['author_id'] as String? ?? 'anonymous';
           final authorName = author != null ? author['full_name'] as String : 'Campus User';
@@ -245,12 +262,22 @@ class ApiService {
             likes: (row['likes_count'] as int?) ?? 0,
           );
         }).toList();
+
+        // Save to cache
+        await CacheService.savePosts(posts.map((p) => p.toJson()).toList());
+
+        return posts;
       }
-      return [];
+      return _getFallbackPosts();
     } catch (e) {
       print('fetchPosts error: $e');
-      return [];
+      return _getFallbackPosts();
     }
+  }
+
+  static List<PostModel> _getFallbackPosts() {
+    final cached = CacheService.getCachedPosts();
+    return cached.map((json) => PostModel.fromJson(Map<String, dynamic>.from(json))).toList();
   }
 
   static Future<PostModel?> fetchPostById(String id) async {

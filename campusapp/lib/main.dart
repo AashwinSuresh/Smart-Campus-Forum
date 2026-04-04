@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:campusapp/core/app_colors.dart';
 import 'package:campusapp/pages/dashboard.dart';
 import 'package:campusapp/pages/login_page.dart';
@@ -6,10 +7,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter/material.dart';
+import 'package:campusapp/services/cache_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await CacheService.init();
 
   await dotenv.load(fileName: ".env");
 

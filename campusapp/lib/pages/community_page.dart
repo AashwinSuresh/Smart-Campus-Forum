@@ -2,9 +2,11 @@ import 'package:campusapp/models/post_model.dart';
 import 'package:campusapp/pages/create_post.dart';
 import 'package:campusapp/pages/profile_page.dart';
 import 'package:campusapp/services/api_service.dart';
+import 'package:campusapp/services/cache_service.dart';
 import 'package:campusapp/widgets/post_cards.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
@@ -21,7 +23,23 @@ class CommunityPageState extends State<CommunityPage> {
   @override
   void initState() {
     super.initState();
-    loadPosts();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    // 1. Load from cache instantly
+    final cached = CacheService.getCachedPosts();
+    if (cached.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _posts = cached.map((json) => PostModel.fromJson(Map<String, dynamic>.from(json))).toList();
+          _isLoading = false; // Don't show total loading if we have cache
+        });
+      }
+    }
+    
+    // 2. Then load from network
+    await loadPosts();
     _loadUserProfile();
   }
 
@@ -36,7 +54,11 @@ class CommunityPageState extends State<CommunityPage> {
   }
 
   Future<void> loadPosts() async {
-    setState(() => _isLoading = true);
+    // Only show loading if we don't have posts yet
+    if (_posts.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+    
     final posts = await ApiService.fetchPosts();
     if (mounted) {
       setState(() {
@@ -81,7 +103,7 @@ class CommunityPageState extends State<CommunityPage> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? _buildShimmerLoading()
           : _posts.isEmpty
               ? Center(
                   child: Text(
@@ -101,6 +123,36 @@ class CommunityPageState extends State<CommunityPage> {
                     },
                   ),
                 ),
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[900]!,
+      highlightColor: Colors.grey[800]!,
+      child: ListView.builder(
+        itemCount: 5,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(radius: 20, backgroundColor: Colors.white),
+                    const SizedBox(width: 12),
+                    Container(width: 100, height: 12, color: Colors.white),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(width: double.infinity, height: 100, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
