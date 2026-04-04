@@ -5,7 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AiApiService {
   static final String baseUrl = dotenv.env['backend_url'] ?? 'http://10.141.4.152:8000';
 
-  static Future<Map<String, dynamic>> sendChatQuery(String query, {String? userId}) async {
+  static Future<Map<String, dynamic>> sendChatQuery(String query, {String? userId, List<Map<String, dynamic>> history = const []}) async {
     final url = Uri.parse('$baseUrl/ai/chat');
 
     try {
@@ -15,6 +15,7 @@ class AiApiService {
         body: jsonEncode({
           'query': query,
           'user_id': userId,
+          'history': history,
         }),
       );
 

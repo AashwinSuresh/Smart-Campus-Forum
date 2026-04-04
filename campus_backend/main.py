@@ -12,7 +12,7 @@ from backup_lost_found import router as backup_lost_found_router
 
 import firebase_admin
 from firebase_admin import credentials, messaging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from groq import Groq
 from ai_utils import upsert_document, search_documents
 
@@ -98,9 +98,6 @@ class LostFoundItem(BaseModel):
 class StatusUpdate(BaseModel):
     status: str
 
-class ChatRequest(BaseModel):
-    query: str
-    user_id: Optional[str] = None
 
 # ── Authentication ─────────────────────────────────────────────────────────────
 
@@ -447,9 +444,11 @@ async def update_item_status(item_id: str, data: StatusUpdate):
         return {"status": "success", "data": response.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 class ChatRequest(BaseModel):
     query: str
     user_id: Optional[str] = None
+    history: List[Dict[str, Any]] = []
 
 #      AI Chat Bot                                                                                                                               
 
@@ -497,11 +496,19 @@ async def ai_chat(request: ChatRequest):
         }}
         """
 
+        # Construct the full conversation history for Groq
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Convert frontend history format to Groq role/content format
+        for msg in request.history:
+            role = "user" if msg.get("isUser") else "assistant"
+            messages.append({"role": role, "content": msg.get("text", "")})
+            
+        # Add the current query
+        messages.append({"role": "user", "content": request.query})
+
         response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.query}
-            ],
+            messages=messages,
             model="llama-3.3-70b-versatile",
             response_format={"type": "json_object"}
         )

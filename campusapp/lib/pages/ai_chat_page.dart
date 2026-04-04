@@ -49,6 +49,9 @@ class _AiChatPageState extends State<AiChatPage> with TickerProviderStateMixin {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    final userId = ApiService.supabase.auth.currentUser?.id ?? 'guest';
+    final history = List<Map<String, dynamic>>.from(_messages);
+
     final userMsg = {'isUser': true, 'text': text};
     setState(() {
       _messages.add(userMsg);
@@ -60,7 +63,11 @@ class _AiChatPageState extends State<AiChatPage> with TickerProviderStateMixin {
     _scrollToBottom();
 
     try {
-      final response = await AiApiService.sendChatQuery(text);
+      final response = await AiApiService.sendChatQuery(
+        text,
+        userId: userId,
+        history: history,
+      );
       
       if (mounted) {
         final aiMsg = {
